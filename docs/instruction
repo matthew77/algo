@@ -9,7 +9,7 @@ algo 目前想到2种策略：trending following 加 oscillation。这2个策略
 计算出一个covariance matrix。（？？？如何确定哪几个品种的correlation 比较低？？？）
 - 回溯几年的历史数据？
   
-  最近3年的数据。（因为基钦周期（库存周期）所以又称为短波理论）。使用周线数据
+  最近3年的数据。（因为基钦周期（库存周期）所以又称为短波理论， 2一4年）。使用周线数据
   计算covariance。
   
 ### 信号周期
