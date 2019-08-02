@@ -156,15 +156,26 @@ class Config:
 
         return ctx
 
-    @staticmethod
-    def get_config_instance():
+    def load_default_config(self):
         from data import oanda
         yaml_file = pkg_resources.open_text(oanda, 'account_info.yml')
         y = yaml.load(yaml_file, Loader=yaml.FullLoader)
-        print(y)
+        self.hostname = y.get("hostname", self.hostname)
+        self.streaming_hostname = y.get(
+            "streaming_hostname", self.streaming_hostname
+        )
+        self.port = y.get("port", self.port)
+        self.ssl = y.get("ssl", self.ssl)
+        self.username = y.get("username", self.username)
+        self.token = y.get("token", self.token)
+        self.accounts = y.get("accounts", self.accounts)
+        self.active_account = y.get(
+            "active_account", self.active_account
+        )
+        self.datetime_format = y.get("datetime_format", self.datetime_format)
 
 
-def make_config_instance(path):
+def make_config_instance(path=''):
     """
     Create a Config instance, load its state from the provided path and 
     ensure that it is valid.
@@ -173,6 +184,10 @@ def make_config_instance(path):
         path: The location of the configuration file
     """
     config = Config()
-    config.load(path)
+    if path:
+        config.load(path)
+    else:
+        # load from python package
+        config.load_default_config()
     config.validate()
     return config
