@@ -134,7 +134,7 @@ class Config:
             self.hostname,
             self.port,
             self.ssl,
-            application="sample_code",
+            application="algo_app",
             token=self.token,
             datetime_format=self.datetime_format
         )
