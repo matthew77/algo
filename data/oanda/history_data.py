@@ -1,5 +1,6 @@
 from datetime import datetime
 import pandas as pd
+import os
 
 # load history data from Oanda api
 import data.oanda.config as oanda_cfg
@@ -91,15 +92,68 @@ def load_candle(instrument, **kwargs):
     return df
 
 
+COUNT = 50  # the max candle can be returned
+GRANULARITY = 'M1'  # 1 min
+# INIT_TIME = '2005-01-01T00:00:00.000000000Z'
+INIT_TIME = '2011-08-29T10:07:00.000000000Z'
+
+
+def update_candle_data(instrument, data_path):
+    file_name = '.'.join([instrument, 'csv'])
+    file_name = os.path.join(data_path, file_name)
+    is_first_run = False
+    if os.path.exists(file_name):
+        # append the new candles into the file
+        df = pd.read_csv(file_name)
+    else:
+        # it is the first time to load the data
+        is_first_run = True
+        kwargs = dict()
+        kwargs["granularity"] = GRANULARITY
+        kwargs["fromTime"] = INIT_TIME
+        kwargs["count"] = COUNT
+        df = load_candle(instrument, **kwargs)
+        df.to_csv(file_name, index=False)
+    # get the timestamp from the last record. It will be the fromTime for the next run.
+    last_rec = df.iloc[len(df)-1]
+    last_timestamp = last_rec['Time']
+    round_ = 0
+    while True:
+        kwargs["fromTime"] = last_timestamp
+        df_buffer = load_candle(instrument, **kwargs)
+        if len(df_buffer) <= 1:
+            print("No more data from server.")
+            break
+        df_buffer = df_buffer.iloc[1:len(df_buffer)]  # remove the first record, since it's duplicated
+        df.to_csv(file_name, mode='a', header=False)
+        if len(df_buffer) < COUNT:
+            print('No more data from server.')
+            break
+        last_rec = df_buffer.iloc[len(df) - 1]
+        last_timestamp = last_rec['Time']
+        # for testing purpose only
+        if round_ >= 100:
+            break
+        round_ += 1
+
+
 if __name__ == "__main__":
     # instruments = load_available_instrument()
     # for i in instruments:
     #     print(i.name)
     #
     instrument = 'CN50_USD'
-    kwargs = dict()
-    kwargs["granularity"] = 'M1'
-    kwargs["fromTime"] = '2019-01-01T00:00:00.000000000Z'
-    df = load_candle(instrument, **kwargs)
-    print(df.loc[0])
-
+    # kwargs = dict()
+    # kwargs["granularity"] = 'M1'
+    # # kwargs["fromTime"] = '2009-01-01T00:00:00.000000000Z'
+    # kwargs["fromTime"] = '2011-10-12T03:40:00.000000000Z'
+    # kwargs["count"] = 5000
+    # # kwargs["toTime"] = '2019-08-01T00:00:00.000000000Z'
+    # df = load_candle(instrument, **kwargs)
+    # print(len(df))
+    # print(df.loc[0])
+    to_path = 'C:\\myproject\\trading\\data'
+    # to_filename = 'CN50_USD.csv'
+    # to_full_filename = os.path.join(to_path, to_filename)
+    # df.to_csv(to_full_filename, index=False)
+    update_candle_data(instrument)
