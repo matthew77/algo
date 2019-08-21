@@ -1,6 +1,7 @@
 from datetime import datetime
 import pandas as pd
 import os
+import time
 
 # load history data from Oanda api
 import data.oanda.config as oanda_cfg
@@ -63,10 +64,18 @@ def load_candle(instrument, **kwargs):
     #
     # for more detailed description: http://developer.oanda.com/rest-live-v20/instrument-ep/
     config = oanda_cfg.make_config_instance()
-    api = config.create_context()
     # Fetch the candles
-    response = api.instrument.candles(instrument, **kwargs)
+    for _ in range(100):
+        try:
+            api = config.create_context()
+            response = api.instrument.candles(instrument, **kwargs)
+            break  # get connection successfully
+        except:
+            print('ERROR in getting the https connection !!!')
+            time.sleep(10)  # wait 10 seconds
+
     if response.status != 200:
+        print('the response status is NOT 200')
         raise Exception(response.body)
 
     header = ["Time", "Open", "High", "Low", "Close", "Volume"]
@@ -92,49 +101,49 @@ def load_candle(instrument, **kwargs):
     return df
 
 
-COUNT = 50  # the max candle can be returned
+COUNT = 5000  # the max candle can be returned
 GRANULARITY = 'M1'  # 1 min
-# INIT_TIME = '2005-01-01T00:00:00.000000000Z'
-INIT_TIME = '2011-08-29T10:07:00.000000000Z'
+INIT_TIME = '2005-01-01T00:00:00.000000000Z'
+# INIT_TIME = '2011-08-29T10:07:00.000000000Z'
 
 
 def update_candle_data(instrument, data_path):
     file_name = '.'.join([instrument, 'csv'])
     file_name = os.path.join(data_path, file_name)
-    is_first_run = False
+    kwargs = dict()
+    kwargs["granularity"] = GRANULARITY
+    kwargs["count"] = COUNT
     if os.path.exists(file_name):
         # append the new candles into the file
         df = pd.read_csv(file_name)
     else:
         # it is the first time to load the data
-        is_first_run = True
-        kwargs = dict()
-        kwargs["granularity"] = GRANULARITY
+        # is_first_run = True
         kwargs["fromTime"] = INIT_TIME
-        kwargs["count"] = COUNT
         df = load_candle(instrument, **kwargs)
         df.to_csv(file_name, index=False)
     # get the timestamp from the last record. It will be the fromTime for the next run.
     last_rec = df.iloc[len(df)-1]
     last_timestamp = last_rec['Time']
-    round_ = 0
+    # round_ = 0
     while True:
+        print(instrument + '--> start loading from time ' + last_timestamp)
         kwargs["fromTime"] = last_timestamp
         df_buffer = load_candle(instrument, **kwargs)
         if len(df_buffer) <= 1:
             print("No more data from server.")
             break
         df_buffer = df_buffer.iloc[1:len(df_buffer)]  # remove the first record, since it's duplicated
-        df.to_csv(file_name, mode='a', header=False)
-        if len(df_buffer) < COUNT:
+        df_buffer.to_csv(file_name, mode='a', header=False, index=False)
+        if len(df_buffer) < COUNT - 1:
             print('No more data from server.')
             break
-        last_rec = df_buffer.iloc[len(df) - 1]
+        last_rec = df_buffer.iloc[len(df_buffer) - 1]
         last_timestamp = last_rec['Time']
         # for testing purpose only
-        if round_ >= 100:
-            break
-        round_ += 1
+        # if round_ >= 100:
+        #     break
+        # round_ += 1
 
 
 if __name__ == "__main__":
@@ -142,7 +151,7 @@ if __name__ == "__main__":
     # for i in instruments:
     #     print(i.name)
     #
-    instrument = 'CN50_USD'
+    # instrument = 'CN50_USD'
     # kwargs = dict()
     # kwargs["granularity"] = 'M1'
     # # kwargs["fromTime"] = '2009-01-01T00:00:00.000000000Z'
@@ -156,4 +165,11 @@ if __name__ == "__main__":
     # to_filename = 'CN50_USD.csv'
     # to_full_filename = os.path.join(to_path, to_filename)
     # df.to_csv(to_full_filename, index=False)
-    update_candle_data(instrument)
+
+    instruments = ['AU200_AUD', 'BCO_USD', 'CORN_USD', 'DE10YB_EUR', 'DE30_EUR', 'EU50_EUR', 'FR40_EUR'
+                   , 'HK33_HKD', 'IN50_USD', 'JP225_USD', 'NAS100_USD', 'NATGAS_USD', 'NL25_EUR',
+                   'SG30_SGD', 'SOYBN_USD', 'SPX500_USD', 'SUGAR_USD', 'TWIX_USD', 'UK100_GBP', 'UK10YB_GBP',
+                   'US2000_USD', 'US30_USD', 'USB02Y_USD', 'USB05Y_USD', 'USB10Y_USD', 'USB30Y_USD', 'WHEAT_USD',
+                   'WTICO_USD', 'XAG_USD', 'XAU_USD', 'XCU_USD', 'XPD_USD', 'XPT_USD', 'CN50_USD']
+    for instrument in instruments:
+        update_candle_data(instrument, to_path)
